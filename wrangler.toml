@@ -1,0 +1,15 @@
+name = "vercel-auto-deploy"
+compatibility_date = "2024-01-01"
+
+# Pages configuration
+pages_build_output_dir = "./"
+
+# Functions configuration (for Workers running on Pages)
+[env.production]
+# Add any production-specific settings here
+
+[env.preview]
+# Add any preview-specific settings here
+
+# Secrets binding - run 'wrangler secret put VERCEL_TOKEN' to set this
+# This will be available as env.VERCEL_TOKEN in your Worker

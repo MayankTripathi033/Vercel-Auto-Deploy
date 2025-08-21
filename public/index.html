@@ -1,0 +1,121 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Vercel Branch Deployer</title>
+    <link rel="stylesheet" href="style.css">
+</head>
+<body>
+    <div class="container">
+        <header>
+            <h1>🚀 Vercel Branch Deployer</h1>
+            <p class="subtitle">Deploy any GitHub branch to your Vercel projects instantly</p>
+        </header>
+
+        <main>
+            <!-- Loading State -->
+            <div id="loading" class="loading">
+                <div class="spinner"></div>
+                <p>Loading your Vercel projects...</p>
+            </div>
+
+            <!-- Error State -->
+            <div id="error" class="error hidden">
+                <div class="error-content">
+                    <strong>❌ Error:</strong> <span id="errorMessage"></span>
+                    <button onclick="loadProjects()" class="retry-btn">🔄 Retry</button>
+                </div>
+            </div>
+
+            <!-- Projects List -->
+            <div id="projectsSection" class="projects-section hidden">
+                <div class="projects-header">
+                    <h2>📋 Your Vercel Projects</h2>
+                    <button onclick="loadProjects()" id="refreshBtn" class="refresh-btn">
+                        🔄 Refresh
+                    </button>
+                    <div id="projectsCount" class="projects-count"></div>
+                </div>
+
+                <div id="projectsGrid" class="projects-grid"></div>
+            </div>
+
+            <!-- Manual Deploy (Fallback) -->
+            <div id="manualDeploy" class="manual-deploy hidden">
+                <h3>🔧 Manual Deploy</h3>
+                <p class="help-text">If your project isn't listed above, you can deploy manually:</p>
+                
+                <form id="manualDeployForm" class="deploy-form">
+                    <div class="form-group">
+                        <label for="repository">
+                            📁 GitHub Repository
+                            <span class="help-text">Format: username/repo-name</span>
+                        </label>
+                        <input 
+                            type="text" 
+                            id="repository" 
+                            placeholder="e.g., johndoe/my-awesome-app" 
+                            pattern="^[a-zA-Z0-9._-]+/[a-zA-Z0-9._-]+$"
+                            title="Please enter in format: username/repository"
+                        >
+                    </div>
+
+                    <div class="form-group">
+                        <label for="manualBranch">
+                            🌿 Branch Name
+                            <span class="help-text">The branch you want to deploy</span>
+                        </label>
+                        <input 
+                            type="text" 
+                            id="manualBranch" 
+                            placeholder="e.g., main, develop, feature/new-ui" 
+                            required
+                        >
+                    </div>
+
+                    <button type="submit" id="manualDeployBtn" class="deploy-button">
+                        <span class="button-content">
+                            <span class="button-icon">🚀</span>
+                            <span class="button-text">Deploy to Vercel</span>
+                        </span>
+                    </button>
+                </form>
+            </div>
+
+            <!-- Global Status Section -->
+            <div id="globalStatus" class="status hidden">
+                <div class="status-content">
+                    <div id="globalStatusIcon" class="status-icon">⏳</div>
+                    <div id="globalStatusMessage" class="status-message"></div>
+                    <div id="globalDeploymentDetails" class="deployment-details hidden">
+                        <div class="deployment-url">
+                            <strong>🔗 Deployment URL:</strong>
+                            <a href="#" id="globalDeploymentLink" target="_blank" rel="noopener"></a>
+                        </div>
+                        <div class="deployment-info">
+                            <small id="globalDeploymentMeta"></small>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Recent Deployments -->
+            <div id="recentDeployments" class="recent-deployments hidden">
+                <h3>📋 Recent Deployments</h3>
+                <div id="deploymentHistory" class="deployment-history"></div>
+            </div>
+        </main>
+
+        <footer>
+            <p>Made with ❤️ for quick Vercel deployments</p>
+            <div class="footer-links">
+                <a href="/health" target="_blank">Health Check</a>
+                <a href="https://vercel.com/docs/rest-api" target="_blank">Vercel API Docs</a>
+            </div>
+        </footer>
+    </div>
+
+    <script src="script.js"></script>
+</body>
+</html>

@@ -1,0 +1,524 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Vercel Auto Deploy</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+        
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            padding: 20px;
+        }
+        
+        .container {
+            background: white;
+            border-radius: 12px;
+            box-shadow: 0 20px 40px rgba(0, 0, 0, 0.1);
+            padding: 40px;
+            max-width: 1000px;
+            margin: 0 auto;
+        }
+        
+        h1 {
+            color: #333;
+            margin-bottom: 10px;
+            font-size: 2.5rem;
+            text-align: center;
+        }
+        
+        .subtitle {
+            color: #666;
+            margin-bottom: 40px;
+            font-size: 1.1rem;
+            text-align: center;
+        }
+        
+        .loading {
+            text-align: center;
+            padding: 40px;
+            color: #666;
+        }
+        
+        .spinner {
+            display: inline-block;
+            width: 40px;
+            height: 40px;
+            border: 4px solid #f3f3f3;
+            border-top: 4px solid #667eea;
+            border-radius: 50%;
+            animation: spin 1s linear infinite;
+            margin-bottom: 20px;
+        }
+        
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+        
+        .error {
+            background: #f8d7da;
+            color: #721c24;
+            padding: 20px;
+            border-radius: 8px;
+            margin-bottom: 20px;
+            border: 1px solid #f5c6cb;
+        }
+        
+        .projects-grid {
+            display: grid;
+            gap: 20px;
+            margin-top: 20px;
+        }
+        
+        .project-card {
+            background: #f8f9fa;
+            border: 1px solid #dee2e6;
+            border-radius: 12px;
+            padding: 24px;
+            transition: all 0.3s ease;
+        }
+        
+        .project-card:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 8px 25px rgba(0, 0, 0, 0.1);
+        }
+        
+        .project-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: flex-start;
+            margin-bottom: 15px;
+            flex-wrap: wrap;
+            gap: 10px;
+        }
+        
+        .project-info {
+            flex: 1;
+            min-width: 200px;
+        }
+        
+        .project-name {
+            font-size: 1.4rem;
+            font-weight: 600;
+            color: #333;
+            margin-bottom: 5px;
+        }
+        
+        .project-url {
+            color: #667eea;
+            text-decoration: none;
+            font-size: 0.9rem;
+            word-break: break-all;
+        }
+        
+        .project-url:hover {
+            text-decoration: underline;
+        }
+        
+        .project-framework {
+            display: inline-block;
+            background: #e9ecef;
+            color: #495057;
+            padding: 4px 8px;
+            border-radius: 4px;
+            font-size: 0.75rem;
+            font-weight: 500;
+            text-transform: uppercase;
+            margin-top: 8px;
+        }
+        
+        .deploy-section {
+            border-top: 1px solid #dee2e6;
+            padding-top: 20px;
+            margin-top: 20px;
+        }
+        
+        .deploy-form {
+            display: flex;
+            gap: 10px;
+            align-items: flex-end;
+            flex-wrap: wrap;
+        }
+        
+        .input-group {
+            flex: 1;
+            min-width: 200px;
+        }
+        
+        .input-group label {
+            display: block;
+            margin-bottom: 5px;
+            font-weight: 600;
+            color: #333;
+            font-size: 0.9rem;
+        }
+        
+        .input-group input {
+            width: 100%;
+            padding: 12px;
+            border: 2px solid #dee2e6;
+            border-radius: 8px;
+            font-size: 16px;
+            transition: all 0.3s ease;
+        }
+        
+        .input-group input:focus {
+            outline: none;
+            border-color: #667eea;
+            box-shadow: 0 0 0 3px rgba(102, 126, 234, 0.1);
+        }
+        
+        .deploy-btn {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            border: none;
+            padding: 12px 24px;
+            border-radius: 8px;
+            font-size: 16px;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            min-width: 120px;
+            height: fit-content;
+        }
+        
+        .deploy-btn:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 8px 20px rgba(0, 0, 0, 0.2);
+        }
+        
+        .deploy-btn:disabled {
+            opacity: 0.6;
+            cursor: not-allowed;
+            transform: none;
+            box-shadow: none;
+        }
+        
+        .deploy-status {
+            margin-top: 15px;
+            padding: 15px;
+            border-radius: 8px;
+            font-size: 14px;
+            transition: all 0.3s ease;
+        }
+        
+        .deploy-status.success {
+            background: #d4edda;
+            border: 1px solid #c3e6cb;
+            color: #155724;
+        }
+        
+        .deploy-status.error {
+            background: #f8d7da;
+            border: 1px solid #f5c6cb;
+            color: #721c24;
+        }
+        
+        .deploy-status.loading {
+            background: #d1ecf1;
+            border: 1px solid #bee5eb;
+            color: #0c5460;
+        }
+        
+        .deployment-link {
+            margin-top: 10px;
+            word-break: break-all;
+        }
+        
+        .deployment-link a {
+            color: #007bff;
+            text-decoration: none;
+            font-weight: 600;
+        }
+        
+        .deployment-link a:hover {
+            text-decoration: underline;
+        }
+        
+        .hidden {
+            display: none;
+        }
+        
+        .mini-spinner {
+            display: inline-block;
+            width: 16px;
+            height: 16px;
+            border: 2px solid #f3f3f3;
+            border-top: 2px solid #ffffff;
+            border-radius: 50%;
+            animation: spin 1s linear infinite;
+            margin-right: 8px;
+        }
+        
+        .refresh-btn {
+            background: #6c757d;
+            color: white;
+            border: none;
+            padding: 12px 24px;
+            border-radius: 8px;
+            font-size: 16px;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            margin-bottom: 20px;
+            display: block;
+            margin-left: auto;
+            margin-right: auto;
+        }
+        
+        .refresh-btn:hover {
+            background: #5a6268;
+            transform: translateY(-1px);
+        }
+        
+        .refresh-btn:disabled {
+            opacity: 0.6;
+            cursor: not-allowed;
+            transform: none;
+        }
+        
+        .projects-count {
+            text-align: center;
+            color: #666;
+            margin-bottom: 20px;
+            font-size: 1.1rem;
+        }
+        
+        @media (max-width: 768px) {
+            .deploy-form {
+                flex-direction: column;
+            }
+            
+            .deploy-btn {
+                width: 100%;
+            }
+            
+            .project-header {
+                flex-direction: column;
+                align-items: stretch;
+            }
+            
+            .container {
+                padding: 20px;
+                margin: 10px;
+            }
+            
+            h1 {
+                font-size: 2rem;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>🚀 Vercel Auto Deploy</h1>
+        <p class="subtitle">Deploy any GitHub branch to your Vercel projects instantly</p>
+        
+        <div id="loading" class="loading">
+            <div class="spinner"></div>
+            <p>Loading your Vercel projects...</p>
+        </div>
+        
+        <div id="error" class="error hidden">
+            <strong>Error:</strong> <span id="errorMessage"></span>
+        </div>
+        
+        <div id="projectsSection" class="hidden">
+            <button onclick="loadProjects()" id="refreshBtn" class="refresh-btn">🔄 Refresh Projects</button>
+            <div id="projectsCount" class="projects-count"></div>
+            <div id="projectsGrid" class="projects-grid"></div>
+        </div>
+    </div>
+
+    <script>
+        let projects = [];
+
+        // Load projects on page load
+        document.addEventListener('DOMContentLoaded', loadProjects);
+
+        async function loadProjects() {
+            const loading = document.getElementById('loading');
+            const error = document.getElementById('error');
+            const projectsSection = document.getElementById('projectsSection');
+            const refreshBtn = document.getElementById('refreshBtn');
+            
+            // Show loading state
+            loading.classList.remove('hidden');
+            error.classList.add('hidden');
+            projectsSection.classList.add('hidden');
+            
+            if (refreshBtn) {
+                refreshBtn.disabled = true;
+                refreshBtn.innerHTML = '🔄 Loading...';
+            }
+
+            try {
+                const response = await fetch('/api/projects');
+                const result = await response.json();
+
+                if (result.success) {
+                    projects = result.projects;
+                    displayProjects(projects);
+                    
+                    // Show projects section
+                    loading.classList.add('hidden');
+                    projectsSection.classList.remove('hidden');
+                } else {
+                    throw new Error(result.error || 'Failed to load projects');
+                }
+
+            } catch (err) {
+                console.error('Error loading projects:', err);
+                showError(err.message);
+                loading.classList.add('hidden');
+            } finally {
+                if (refreshBtn) {
+                    refreshBtn.disabled = false;
+                    refreshBtn.innerHTML = '🔄 Refresh Projects';
+                }
+            }
+        }
+
+        function displayProjects(projectsList) {
+            const projectsGrid = document.getElementById('projectsGrid');
+            const projectsCount = document.getElementById('projectsCount');
+            
+            projectsCount.textContent = `Found ${projectsList.length} project${projectsList.length !== 1 ? 's' : ''}`;
+            
+            if (projectsList.length === 0) {
+                projectsGrid.innerHTML = '<p style="text-align: center; color: #666; padding: 40px;">No projects found in your Vercel account.</p>';
+                return;
+            }
+
+            projectsGrid.innerHTML = projectsList.map(project => `
+                <div class="project-card">
+                    <div class="project-header">
+                        <div class="project-info">
+                            <div class="project-name">${escapeHtml(project.name)}</div>
+                            ${project.productionUrl !== 'No production URL' ? 
+                                `<a href="${project.productionUrl}" target="_blank" class="project-url">${project.productionUrl}</a>` : 
+                                '<span class="project-url" style="color: #999;">No production URL</span>'
+                            }
+                            ${project.framework ? `<div class="project-framework">${escapeHtml(project.framework)}</div>` : ''}
+                        </div>
+                    </div>
+                    
+                    <div class="deploy-section">
+                        <form class="deploy-form" onsubmit="deployProject(event, '${escapeHtml(project.name)}')">
+                            <div class="input-group">
+                                <label for="branch-${escapeHtml(project.name)}">Branch Name:</label>
+                                <input 
+                                    type="text" 
+                                    id="branch-${escapeHtml(project.name)}"
+                                    placeholder="e.g., main, develop, feature/new-ui" 
+                                    required
+                                >
+                            </div>
+                            <button type="submit" class="deploy-btn">Deploy</button>
+                        </form>
+                        
+                        <div id="status-${escapeHtml(project.name)}" class="hidden deploy-status">
+                            <div id="statusMessage-${escapeHtml(project.name)}"></div>
+                            <div id="deploymentLink-${escapeHtml(project.name)}" class="deployment-link hidden"></div>
+                        </div>
+                    </div>
+                </div>
+            `).join('');
+        }
+
+        async function deployProject(event, projectName) {
+            event.preventDefault();
+            
+            const branchInput = document.getElementById(`branch-${projectName}`);
+            const deployBtn = event.target.querySelector('.deploy-btn');
+            const status = document.getElementById(`status-${projectName}`);
+            const statusMessage = document.getElementById(`statusMessage-${projectName}`);
+            const deploymentLink = document.getElementById(`deploymentLink-${projectName}`);
+            
+            const branch = branchInput.value.trim();
+            if (!branch) {
+                showProjectStatus(projectName, 'error', 'Please enter a branch name');
+                return;
+            }
+
+            // Show loading state
+            deployBtn.disabled = true;
+            deployBtn.innerHTML = '<span class="mini-spinner"></span>Deploying...';
+            showProjectStatus(projectName, 'loading', `Deploying "${branch}" to "${projectName}"...`);
+
+            try {
+                const response = await fetch('/api/deploy', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                    },
+                    body: JSON.stringify({ 
+                        branch: branch,
+                        projectName: projectName 
+                    }),
+                });
+
+                const result = await response.json();
+
+                if (result.success) {
+                    showProjectStatus(projectName, 'success', `🎉 Deployment successful!`);
+                    showProjectDeploymentLink(projectName, result.deploymentUrl, result.deploymentId);
+                    branchInput.value = ''; // Clear the input
+                } else {
+                    throw new Error(result.error || 'Deployment failed');
+                }
+
+            } catch (error) {
+                console.error('Deployment error:', error);
+                showProjectStatus(projectName, 'error', `❌ Deployment failed: ${error.message}`);
+            } finally {
+                // Reset button state
+                deployBtn.disabled = false;
+                deployBtn.innerHTML = 'Deploy';
+            }
+        }
+
+        function showProjectStatus(projectName, type, message) {
+            const status = document.getElementById(`status-${projectName}`);
+            const statusMessage = document.getElementById(`statusMessage-${projectName}`);
+            const deploymentLink = document.getElementById(`deploymentLink-${projectName}`);
+            
+            status.className = `deploy-status ${type}`;
+            statusMessage.textContent = message;
+            status.classList.remove('hidden');
+            deploymentLink.classList.add('hidden');
+        }
+
+        function showProjectDeploymentLink(projectName, url, deploymentId) {
+            const deploymentLink = document.getElementById(`deploymentLink-${projectName}`);
+            deploymentLink.innerHTML = `
+                <strong>🔗 Deployment URL:</strong><br>
+                <a href="${url}" target="_blank" rel="noopener">${url}</a>
+                <br><small style="color: #666;">ID: ${deploymentId}</small>
+            `;
+            deploymentLink.classList.remove('hidden');
+        }
+
+        function showError(message) {
+            const error = document.getElementById('error');
+            const errorMessage = document.getElementById('errorMessage');
+            errorMessage.textContent = message;
+            error.classList.remove('hidden');
+        }
+
+        function escapeHtml(text) {
+            const div = document.createElement('div');
+            div.textContent = text;
+            return div.innerHTML;
+        }
+    </script>
+</body>
+</html>

@@ -1,0 +1,190 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>List Vercel Projects</title>
+    <style>
+        body {
+            font-family: system-ui, -apple-system, sans-serif;
+            max-width: 800px;
+            margin: 40px auto;
+            padding: 20px;
+            background: #fafafa;
+        }
+        .container {
+            background: white;
+            padding: 30px;
+            border-radius: 8px;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+        }
+        input, button {
+            padding: 12px;
+            margin: 10px 0;
+            border: 2px solid #ddd;
+            border-radius: 6px;
+            font-size: 16px;
+        }
+        button {
+            background: #0070f3;
+            color: white;
+            border: none;
+            cursor: pointer;
+            min-width: 150px;
+        }
+        button:hover { background: #0051cc; }
+        button:disabled { opacity: 0.6; cursor: not-allowed; }
+        .project-list {
+            margin-top: 20px;
+        }
+        .project-item {
+            padding: 15px;
+            margin: 10px 0;
+            border: 1px solid #eee;
+            border-radius: 6px;
+            background: #f9f9f9;
+        }
+        .project-name {
+            font-weight: bold;
+            color: #0070f3;
+            font-size: 18px;
+        }
+        .project-url {
+            color: #666;
+            margin-top: 5px;
+        }
+        .error {
+            color: red;
+            background: #ffe6e6;
+            padding: 15px;
+            border-radius: 6px;
+            margin-top: 20px;
+        }
+        .success {
+            color: green;
+            background: #e6ffe6;
+            padding: 15px;
+            border-radius: 6px;
+            margin-top: 20px;
+        }
+        code {
+            background: #f1f1f1;
+            padding: 2px 6px;
+            border-radius: 3px;
+            font-family: 'Courier New', monospace;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>🔍 List Your Vercel Projects</h1>
+        <p>Enter your Vercel token to see all your projects:</p>
+        
+        <div>
+            <label for="tokenInput">Vercel Token:</label><br>
+            <input type="password" id="tokenInput" placeholder="vercel_xxx..." style="width: 100%; max-width: 400px;">
+            <br>
+            <button onclick="listProjects()" id="listBtn">List Projects</button>
+        </div>
+
+        <div id="result"></div>
+
+        <div style="margin-top: 30px; padding: 20px; background: #f0f8ff; border-radius: 6px;">
+            <h3>🔑 How to Get Your Vercel Token:</h3>
+            <ol>
+                <li>Go to <a href="https://vercel.com/account/tokens" target="_blank">vercel.com/account/tokens</a></li>
+                <li>Click <strong>"Create Token"</strong></li>
+                <li>Give it a name (e.g., "Auto Deploy")</li>
+                <li>Set scope to your account/team</li>
+                <li>Copy the generated token</li>
+                <li>Paste it above to see your projects</li>
+            </ol>
+        </div>
+    </div>
+
+    <script>
+        async function listProjects() {
+            const token = document.getElementById('tokenInput').value.trim();
+            const button = document.getElementById('listBtn');
+            const result = document.getElementById('result');
+
+            if (!token) {
+                result.innerHTML = '<div class="error">Please enter your Vercel token</div>';
+                return;
+            }
+
+            button.disabled = true;
+            button.textContent = 'Loading...';
+            
+            try {
+                const response = await fetch('https://api.vercel.com/v9/projects', {
+                    headers: {
+                        'Authorization': `Bearer ${token}`,
+                        'Content-Type': 'application/json'
+                    }
+                });
+
+                if (!response.ok) {
+                    throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+                }
+
+                const data = await response.json();
+                
+                if (data.projects && data.projects.length > 0) {
+                    let html = '<div class="success">✅ Found ' + data.projects.length + ' projects:</div>';
+                    html += '<div class="project-list">';
+                    
+                    data.projects.forEach(project => {
+                        const productionUrl = project.alias && project.alias.length > 0 
+                            ? `https://${project.alias[0].domain}`
+                            : project.targets?.production?.url 
+                                ? `https://${project.targets.production.url}`
+                                : 'No production URL';
+                        
+                        html += `
+                            <div class="project-item">
+                                <div class="project-name">${project.name}</div>
+                                <div class="project-url">🌐 ${productionUrl}</div>
+                                <div style="margin-top: 8px; font-size: 14px; color: #888;">
+                                    ID: <code>${project.id}</code>
+                                </div>
+                            </div>
+                        `;
+                    });
+                    
+                    html += '</div>';
+                    result.innerHTML = html;
+                    
+                    // Also show configuration instructions
+                    html += `
+                        <div style="margin-top: 30px; padding: 20px; background: #fff3cd; border-radius: 6px; border-left: 4px solid #ffc107;">
+                            <h3>📝 Configuration Instructions:</h3>
+                            <p>To use any of these projects with your Vercel Auto Deploy tool:</p>
+                            <ol>
+                                <li>Copy the <strong>project name</strong> from above</li>
+                                <li>Edit <code>functions/api/deploy.js</code> in your project</li>
+                                <li>Update the <code>projectName</code> variable with your chosen project name</li>
+                                <li>Also update <code>githubRepo</code> with your GitHub repo (format: username/repo-name)</li>
+                            </ol>
+                        </div>
+                    `;
+                    
+                    result.innerHTML = html;
+                } else {
+                    result.innerHTML = '<div class="error">No projects found. Make sure you have projects in your Vercel account.</div>';
+                }
+
+            } catch (error) {
+                console.error('Error:', error);
+                result.innerHTML = `<div class="error">❌ Error: ${error.message}<br><br>Make sure your token is valid and has the correct permissions.</div>`;
+            } finally {
+                button.disabled = false;
+                button.textContent = 'List Projects';
+            }
+        }
+
+        // Auto-focus on input
+        document.getElementById('tokenInput').focus();
+    </script>
+</body>
+</html>
