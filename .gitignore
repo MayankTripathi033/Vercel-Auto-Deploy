@@ -4,9 +4,6 @@ npm-debug.log*
 yarn-debug.log*
 yarn-error.log*
 
-# Wrangler
-.wrangler/
-
 # Environment variables
 .env
 .env.local
@@ -57,5 +54,3 @@ jspm_packages/
 dist/
 build/
 
-# Cloudflare
-.wrangler/

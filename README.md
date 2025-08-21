@@ -1,11 +1,11 @@
 # Vercel Auto Deploy 🚀
 
-A Cloudflare Pages + Worker project that allows you to deploy different branches of your GitHub repository to Vercel by simply typing the branch name.
+A Node.js + Express project that allows you to deploy different branches of your GitHub repository to Vercel by simply typing the branch name.
 
 ## Features
 
-- 🌐 Modern web interface hosted on Cloudflare Pages
-- ⚡ Serverless API powered by Cloudflare Workers
+- 🌐 Modern web interface served by Express
+- ⚡ REST API powered by Express
 - 🔄 **Auto-fetch all your Vercel projects** - no manual configuration needed!
 - 🎯 Deploy any GitHub branch to any project instantly
 - 📋 Individual deploy forms for each project with branch input
@@ -23,7 +23,7 @@ vercel-auto-deploy/
 │       └── projects.js        # Cloudflare Worker for fetching projects
 ├── index.html                 # Frontend interface (auto-fetches projects)
 ├── list-vercel-projects.html  # Standalone helper tool
-├── wrangler.toml             # Cloudflare configuration
+├── server.js                 # Express server
 ├── package.json              # Project dependencies
 ├── .env.example              # Environment variables template
 ├── .gitignore               # Git exclusions
@@ -43,7 +43,6 @@ vercel-auto-deploy/
 ### 2. Install Dependencies
 
 ```bash
-npm install -g wrangler
 npm install
 ```
 
@@ -51,7 +50,7 @@ npm install
 
 You **only** need to configure your GitHub repository now - projects are auto-loaded!
 
-Edit `functions/api/deploy.js` and update the GitHub repo:
+(Optional) If you were using the worker version: Edit `functions/api/deploy.js` and update the GitHub repo:
 
 ```javascript
 // Line 68 - Update this with your actual GitHub repo
@@ -70,21 +69,17 @@ const githubRepo = 'your-username/your-repo-name';
 4. Set scope to your account
 5. Copy the token (you'll need it in the next step)
 
-### 5. Set Your Vercel Token as Secret
+### 5. Set Environment Variables
 
-```bash
-npx wrangler secret put VERCEL_TOKEN
+Create a `.env` file from `.env.example` and set:
+
+```
+VERCEL_TOKEN=your_vercel_token_here
+VERCEL_TEAM_ID=your_team_id_here
+PORT=3000
 ```
 
-When prompted, paste your Vercel token.
-
-### 6. Login to Cloudflare
-
-```bash
-npx wrangler login
-```
-
-This will open your browser to authenticate with Cloudflare.
+No Cloudflare account or Wrangler needed.
 
 ## Local Development
 
@@ -94,36 +89,23 @@ To run the project locally:
 npm run dev
 ```
 
-This will start a local development server at `http://localhost:8788`
+This will start a local development server at `http://localhost:3000` (or the port you set)
 
 ## Deployment
 
-### Deploy to Cloudflare Pages
+### Deploy
 
-1. First deployment (creates the project):
-```bash
-npm run deploy
-```
+You can deploy this app to any Node hosting or Vercel as a Node server.
 
-2. For subsequent deployments:
-```bash
-npx wrangler pages deploy . --project-name=vercel-auto-deploy
-```
+- Build step: none
+- Start command: `node server.js`
+- Env vars: `VERCEL_TOKEN`, `VERCEL_TEAM_ID`, `PORT`
 
-### Alternative: Connect GitHub Repository
-
-1. Go to [Cloudflare Dashboard > Pages](https://dash.cloudflare.com/pages)
-2. Click "Connect to Git"
-3. Select your GitHub repository
-4. Configure build settings:
-   - Build command: (leave empty)
-   - Build output directory: `/`
-5. Set environment variables:
-   - Add `VERCEL_TOKEN` with your Vercel token value
+If deploying to Vercel as a server, configure it to run `server.js` with Node and expose the `public` folder for static files.
 
 ## Usage
 
-1. Visit your deployed Cloudflare Pages URL
+1. Visit your app URL
 2. **All your Vercel projects will be automatically loaded and displayed!**
 3. For each project you want to deploy:
    - Enter the branch name (e.g., `main`, `develop`, `feature/new-ui`)
