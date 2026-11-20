@@ -8,9 +8,11 @@
 
   // Vercel accounts: VERCEL_ACCOUNTS="name:token:teamId,name2:token2" (teamId optional).
   // Falls back to single VERCEL_TOKEN / VERCEL_TEAM_ID.
-  const accounts = (process.env.VERCEL_ACCOUNTS || '').split(',').filter(e => e.trim()).map(e => {
+  const accounts = (process.env.VERCEL_ACCOUNTS || '').split(',').filter(e => e.trim()).map((e, i, all) => {
     const [name, token, teamId] = e.split(':').map(x => x.trim());
-    return { name, token, teamId };
+    // Duplicate names would route every deploy to the first match, so suffix repeats: personal, personal-2.
+    const dupes = all.slice(0, i).filter(p => p.split(':')[0].trim() === name).length;
+    return { name: dupes ? `${name}-${dupes + 1}` : name, token, teamId };
   });
   if (!accounts.length && process.env.VERCEL_TOKEN) {
     accounts.push({ name: 'default', token: process.env.VERCEL_TOKEN, teamId: process.env.VERCEL_TEAM_ID });

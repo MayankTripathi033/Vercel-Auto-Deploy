@@ -35,7 +35,8 @@ async function streamDeploymentSSE(body, { onEvent, onClose, onError } = {}) {
   });
 
   if (!resp.ok || !resp.body) {
-    const msg = `Failed to start deployment: ${resp.status} ${resp.statusText}`;
+    const err = await resp.json().catch(() => ({}));
+    const msg = `Failed to start deployment: ${err.error || `${resp.status} ${resp.statusText}`}`;
     onError?.(msg);
     throw new Error(msg);
   }
