@@ -175,6 +175,7 @@ function displayProjects(projectsList) {
             <div class="project-header">
                 <div class="project-name">
                     📁 ${escapeHtml(project.name)}
+                    <span class="project-framework">👤 ${escapeHtml(project.account)}</span>
                     ${project.framework ? `<span class="project-framework">${escapeHtml(project.framework)}</span>` : ''}
                 </div>
                 ${project.productionUrl !== 'No production URL' ? 
@@ -231,11 +232,11 @@ async function deployProject(event, projectName, projectId) {
     showProjectStatus(projectName, 'loading', `🚀 Deploying "${branch}" to "${projectName}"...`);
 
     // Find project's git repository
-    const project = projects.find(p => p.name === projectName);
+    const project = projects.find(p => p.id === projectId);
     const repository = project?.gitRepository;
 
     await streamDeploymentSSE(
-      { projectName, branch, repository },
+      { projectName, branch, repository, account: project?.account },
       {
         onEvent: (eventName, data) => {
           switch (eventName) {

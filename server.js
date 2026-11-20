@@ -1,10 +1,22 @@
   const express = require('express');
   const cors = require('cors');
   const path = require('path');
-  require('dotenv').config();
+  require('dotenv').config({ path: ['.env.local', '.env'] });
 
   const app = express();
   const PORT = process.env.PORT || 3000;
+
+  // Vercel accounts: VERCEL_ACCOUNTS="name:token:teamId,name2:token2" (teamId optional).
+  // Falls back to single VERCEL_TOKEN / VERCEL_TEAM_ID.
+  const accounts = (process.env.VERCEL_ACCOUNTS || '').split(',').filter(e => e.trim()).map(e => {
+    const [name, token, teamId] = e.split(':').map(x => x.trim());
+    return { name, token, teamId };
+  });
+  if (!accounts.length && process.env.VERCEL_TOKEN) {
+    accounts.push({ name: 'default', token: process.env.VERCEL_TOKEN, teamId: process.env.VERCEL_TEAM_ID });
+  }
+  const getAccount = name => accounts.find(a => a.name === name) || (accounts.length === 1 ? accounts[0] : null);
+  const teamQs = (a, sep = '?') => (a.teamId ? `${sep}teamId=${encodeURIComponent(a.teamId)}` : '');
 
   // Middleware
   app.use(cors());
@@ -18,73 +30,55 @@
 
   // API endpoint to get all Vercel projects
   app.get('/api/projects', async (req, res) => {
-    try {
-      const vercelToken = process.env.VERCEL_TOKEN;
-      if (!vercelToken) {
-        return res.status(500).json({
-          success: false,
-          error: 'Vercel token not configured. Please set VERCEL_TOKEN in your environment variables.'
-        });
-      }
-
-      console.log('🔍 Fetching Vercel projects...');
-
-      // Fetch projects from Vercel API
-      const vercelResponse = await fetch('https://api.vercel.com/v9/projects?limit=50', {
-        headers: {
-          'Authorization': `Bearer ${vercelToken}`,
-          'Content-Type': 'application/json'
-        }
+    if (!accounts.length) {
+      return res.status(500).json({
+        success: false,
+        error: 'No Vercel account configured. Set VERCEL_ACCOUNTS (or VERCEL_TOKEN) in your environment variables.'
       });
+    }
 
-      if (!vercelResponse.ok) {
-        const errorData = await vercelResponse.json().catch(() => ({}));
-        console.error('Vercel Projects API Error:', errorData);
-        return res.status(vercelResponse.status).json({
-          success: false,
-          error: 'Failed to fetch projects from Vercel',
-          details: errorData.error?.message || vercelResponse.statusText
+    console.log(`🔍 Fetching Vercel projects from ${accounts.length} account(s)...`);
+    const errors = [];
+
+    const lists = await Promise.all(accounts.map(async account => {
+      try {
+        const vercelResponse = await fetch(`https://api.vercel.com/v9/projects?limit=50${teamQs(account, '&')}`, {
+          headers: { 'Authorization': `Bearer ${account.token}` }
         });
-      }
-
-      const result = await vercelResponse.json();
-      const projectsArray = result.projects || [];
-
-      // Transform projects data
-      const projects = projectsArray.map(project => {
-        // Get production URL
-        let productionUrl = 'No production URL';
-        if (project.targets?.production?.alias && project.targets.production.alias.length > 0) {
-          productionUrl = `https://${project.targets.production.alias[0]}`;
+        if (!vercelResponse.ok) {
+          const errorData = await vercelResponse.json().catch(() => ({}));
+          console.error(`Vercel Projects API Error (${account.name}):`, errorData);
+          errors.push({ account: account.name, error: errorData.error?.message || vercelResponse.statusText });
+          return [];
         }
-
-        return {
+        const result = await vercelResponse.json();
+        return (result.projects || []).map(project => ({
           id: project.id,
           name: project.name,
+          account: account.name,
           framework: project.framework || 'Unknown',
-          productionUrl: productionUrl,
+          productionUrl: project.targets?.production?.alias?.length
+            ? `https://${project.targets.production.alias[0]}`
+            : 'No production URL',
           createdAt: project.createdAt,
           updatedAt: project.updatedAt,
           gitRepository: project.link?.repo || null
-        };
-      });
+        }));
+      } catch (error) {
+        console.error(`Error fetching projects (${account.name}):`, error);
+        errors.push({ account: account.name, error: error.message });
+        return [];
+      }
+    }));
 
-      console.log(`✅ Found ${projects.length} Vercel projects`);
+    const projects = lists.flat();
+    console.log(`✅ Found ${projects.length} Vercel projects`);
 
-      res.json({
-        success: true,
-        projects: projects,
-        total: projects.length
-      });
-
-    } catch (error) {
-      console.error('Error fetching Vercel projects:', error);
-      res.status(500).json({
-        success: false,
-        error: 'Internal server error',
-        details: error.message
-      });
+    // Only fail when every account failed; otherwise show what loaded.
+    if (errors.length === accounts.length) {
+      return res.status(502).json({ success: false, error: 'Failed to fetch projects from Vercel', details: errors });
     }
+    res.json({ success: true, projects, total: projects.length, errors, accounts: accounts.map(a => a.name) });
   });
 
   // API endpoint to deploy to Vercel
@@ -94,7 +88,7 @@
 // API endpoint to deploy to Vercel
 app.post('/api/deploy', async (req, res) => {
   try {
-    const { repository, branch, projectName } = req.body;
+    const { repository, branch, projectName, account: accountName } = req.body;
     console.log(`Received deployment request: repository=${repository}, branch=${branch}, projectName=${projectName}`);
 
     // Validation
@@ -102,19 +96,19 @@ app.post('/api/deploy', async (req, res) => {
       return res.status(400).json({ success: false, error: 'Branch name is required' });
     }
 
-    const vercelToken = process.env.VERCEL_TOKEN;
-    const teamId = process.env.VERCEL_TEAM_ID; // 👈 store teamId in env
-    if (!vercelToken || !teamId) {
-      return res.status(500).json({
+    const account = getAccount(accountName);
+    if (!account) {
+      return res.status(400).json({
         success: false,
-        error: 'Vercel token or teamId not configured. Please set VERCEL_TOKEN and VERCEL_TEAM_ID in your environment variables.'
+        error: accountName ? `Unknown Vercel account: ${accountName}` : 'Account is required when multiple Vercel accounts are configured'
       });
     }
+    const vercelToken = account.token;
 
     // Resolve repoId (you can hardcode from project data too)
     async function getRepoId(repoName) {
       try {
-        const reposResponse = await fetch(`https://api.vercel.com/v9/projects?teamId=${teamId}`, {
+        const reposResponse = await fetch(`https://api.vercel.com/v9/projects${teamQs(account)}`, {
           headers: { 'Authorization': `Bearer ${vercelToken}` }
         });
 
@@ -155,7 +149,7 @@ app.post('/api/deploy', async (req, res) => {
     console.log(`📦 Deployment Body:`, JSON.stringify(deploymentBody, null, 2));
 
     // Use generic deployments endpoint
-    const vercelResponse = await fetch(`https://api.vercel.com/v13/deployments?teamId=${teamId}`, {
+    const vercelResponse = await fetch(`https://api.vercel.com/v13/deployments${teamQs(account)}`, {
       method: 'POST',
       headers: {
         'Authorization': `Bearer ${vercelToken}`,
@@ -185,6 +179,7 @@ app.post('/api/deploy', async (req, res) => {
       deploymentId: result.uid,
       repository,
       branch,
+      account: account.name,
       status: result.readyState || 'BUILDING',
       inspectorUrl: result.inspectorUrl || null
     });
@@ -204,18 +199,18 @@ app.post('/api/deploy', async (req, res) => {
   app.get('/api/deployment/:deploymentId', async (req, res) => {
     try {
       const { deploymentId } = req.params;
-      const vercelToken = process.env.VERCEL_TOKEN;
+      const account = getAccount(req.query.account);
 
-      if (!vercelToken) {
-        return res.status(500).json({
+      if (!account) {
+        return res.status(400).json({
           success: false,
-          error: 'Vercel token not configured'
+          error: 'Unknown or missing Vercel account (?account=name)'
         });
       }
 
-      const vercelResponse = await fetch(`https://api.vercel.com/v13/deployments/${deploymentId}`, {
+      const vercelResponse = await fetch(`https://api.vercel.com/v13/deployments/${encodeURIComponent(deploymentId)}${teamQs(account)}`, {
         headers: {
-          'Authorization': `Bearer ${vercelToken}`,
+          'Authorization': `Bearer ${account.token}`,
         }
       });
 
@@ -253,7 +248,7 @@ app.post('/api/deploy', async (req, res) => {
     res.json({ 
       status: 'OK', 
       timestamp: new Date().toISOString(),
-      vercelTokenConfigured: !!process.env.VERCEL_TOKEN
+      vercelAccounts: accounts.map(a => a.name)
     });
   });
 
@@ -261,10 +256,10 @@ app.post('/api/deploy', async (req, res) => {
   app.listen(PORT, () => {
     console.log(`🚀 Vercel Deployer running on http://localhost:${PORT}`);
     console.log(`📁 Serving static files from 'public' directory`);
-    console.log(`🔑 Vercel token ${process.env.VERCEL_TOKEN ? 'is configured' : 'is NOT configured'}`);
+    console.log(`🔑 Vercel accounts: ${accounts.map(a => a.name).join(', ') || 'none'}`);
     
-    if (!process.env.VERCEL_TOKEN) {
-      console.log(`⚠️  Please set VERCEL_TOKEN environment variable`);
+    if (!accounts.length) {
+      console.log(`⚠️  Please set VERCEL_ACCOUNTS (or VERCEL_TOKEN) environment variable`);
     }
   });
 

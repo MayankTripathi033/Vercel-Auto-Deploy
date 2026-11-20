@@ -74,10 +74,13 @@ const githubRepo = 'your-username/your-repo-name';
 Create a `.env` file from `.env.example` and set:
 
 ```
-VERCEL_TOKEN=your_vercel_token_here
-VERCEL_TEAM_ID=your_team_id_here
+# One entry per Vercel account: name:token:teamId (teamId optional), comma-separated
+VERCEL_ACCOUNTS=personal:token_one,work:token_two:team_abc123
 PORT=3000
 ```
+
+Projects from all accounts are listed together, each tagged with its account name.
+A single `VERCEL_TOKEN` / `VERCEL_TEAM_ID` still works when `VERCEL_ACCOUNTS` is empty.
 
 No Cloudflare account or Wrangler needed.
 
