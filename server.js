@@ -92,8 +92,8 @@ app.post('/api/deploy', async (req, res) => {
     console.log(`Received deployment request: repository=${repository}, branch=${branch}, projectName=${projectName}`);
 
     // Validation
-    if (!branch) {
-      return res.status(400).json({ success: false, error: 'Branch name is required' });
+    if (!branch || !projectName) {
+      return res.status(400).json({ success: false, error: 'Branch and project name are required' });
     }
 
     const account = getAccount(accountName);
@@ -105,45 +105,28 @@ app.post('/api/deploy', async (req, res) => {
     }
     const vercelToken = account.token;
 
-    // Resolve repoId (you can hardcode from project data too)
-    async function getRepoId(repoName) {
-      try {
-        const reposResponse = await fetch(`https://api.vercel.com/v9/projects${teamQs(account)}`, {
-          headers: { 'Authorization': `Bearer ${vercelToken}` }
-        });
+    // Vercel needs repoId, or org + repo. Read both from the project's git link.
+    const projectResponse = await fetch(
+      `https://api.vercel.com/v9/projects/${encodeURIComponent(projectName)}${teamQs(account)}`,
+      { headers: { 'Authorization': `Bearer ${vercelToken}` } }
+    );
+    const link = projectResponse.ok ? (await projectResponse.json()).link : null;
+    const [repoOrg, repoName] = (repository || '').includes('/') ? repository.split('/') : [link?.org, link?.repo || repository];
 
-        if (!reposResponse.ok) {
-          console.warn('⚠️ Failed to fetch projects');
-          return null;
-        }
-
-        const reposData = await reposResponse.json();
-        const project = reposData.projects.find(
-          p => p.name === projectName || (repository && p.link?.repo === repository)
-        );
-        if (project?.link?.repoId) {
-          console.log(`✅ Found repoId: ${project.link.repoId}`);
-          return project.link.repoId;
-        }
-        return null;
-      } catch (error) {
-        console.warn(`⚠️ Error fetching repoId: ${error.message}`);
-        return null;
-      }
+    if (!link?.repoId && !(repoOrg && repoName)) {
+      return res.status(400).json({
+        success: false,
+        error: `Project "${projectName}" has no GitHub repo connected in account "${account.name}". Connect it in Vercel → Settings → Git.`
+      });
     }
-
-    const repoId = await getRepoId(repository);
 
     // Prepare deployment payload
     const deploymentBody = {
-      name: projectName || (repository ? repository.split('/')[1] : 'deployment'),
+      name: projectName,
       target: 'production',
-      gitSource: {
-        type: 'github',
-        ref: branch,
-        ...(repoId && { repoId }),
-        ...(repository && !repoId && { repo: repository })
-      }
+      gitSource: link?.repoId
+        ? { type: 'github', ref: branch, repoId: link.repoId }
+        : { type: 'github', ref: branch, org: repoOrg, repo: repoName }
     };
 
     console.log(`📦 Deployment Body:`, JSON.stringify(deploymentBody, null, 2));
